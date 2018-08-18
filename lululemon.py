@@ -1,6 +1,7 @@
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
 import json
+import re
 
 
 class LululemonSpider(CrawlSpider):
@@ -23,6 +24,8 @@ class LululemonSpider(CrawlSpider):
         raw_data = json.loads(response.css('script:contains(productData) ::text').extract_first()[27:])
         current_product_data = raw_data['rootReducer']['application']['currentProductContainer']['props']
         retailer_sku = current_product_data['productData']['product-summary']['default-sku']
+        gender = ' '.join(current_product_data['productData']['product-summary']['all-ancestors-display-name'])
+        gender = re.search(r"Men's \+ Women's|men|women|girl", gender, re.I).group()
         category = current_product_data['productData']['product-summary']['product-category']
         brand = current_product_data['translations']['seo']['copyright']['value']
         url = response.urljoin(current_product_data['match']['url'])
@@ -35,6 +38,7 @@ class LululemonSpider(CrawlSpider):
 
         yield {
             'retailer_sku': retailer_sku,
+            'gender': gender
             'category': category,
             'brand': brand,
             'url': url,
