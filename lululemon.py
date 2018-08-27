@@ -38,7 +38,7 @@ class LululemonSpider(CrawlSpider):
 
         yield {
             'retailer_sku': retailer_sku,
-            'gender': gender
+            'gender': gender,
             'category': category,
             'brand': brand,
             'url': url,
