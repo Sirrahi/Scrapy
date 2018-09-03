@@ -1,0 +1,1 @@
+from triumph import app

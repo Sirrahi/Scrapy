@@ -25,7 +25,7 @@ class Triumph(CrawlSpider):
     )
 
     def parse_item(self, response):
-        skus = []
+        skus = {}
         image_urls = []
         item = ItemLoader(item=Item(), response=response)
 
@@ -53,20 +53,23 @@ class Triumph(CrawlSpider):
         color = self.sku_color(response)
         price = self.sku_price(response)
         currency = self.sku_currency(response)
+        image_urls_each_color = self.image_urls_each_color(response)
 
-        image_urls = self.image_urls(response)
-        self.skus(response, sizes, color, price, currency)
-
+        self.image_urls(response, image_urls_each_color)
+        self.skus(response, sizes, color, price, currency, image_urls_each_color)
         self.color_url_pop(color_urls)
 
         if len(color_urls) == 0:
             item = response.meta['item']
-            item.add_value('image_urls', image_urls)
+            item.add_value('image_urls', response.meta['image_urls'])
             item.add_value('skus', response.meta['skus'])
 
             yield {
                 'item': item.load_item()
             }
+
+    def image_urls_each_color(self, response):
+        return response.css('.mainimageContainer img ::attr(src)').extract()
 
     def clean(self, text):
         return text.strip()
@@ -74,17 +77,18 @@ class Triumph(CrawlSpider):
     def color_url_pop(self, color_urls):
         color_urls.pop()
 
-    def skus(self, response, sizes, color, price, currency):
+    def skus(self, response, sizes, color, price, currency, image_urls_each_color):
         skus = response.meta['skus']
+        sku = {}
         for size in sizes:
-            skus.append({color + '-' + self.clean(size): {'color': color, 'size': self.clean(size),
-                                                          'price': price, 'currency': currency}})
+            sku[color + '-' + self.clean(size)] = {'color': color, 'size': self.clean(size),
+                                                   'price': price, 'currency': currency,
+                                                   'image_urls': image_urls_each_color}
+            skus.update(sku)
 
-    def image_urls(self, response):
-        image_urls_each_color = response.css('.mainimageContainer img ::attr(src)').extract()
+    def image_urls(self, response, image_urls_each_color):
         image_urls = response.meta['image_urls']
-        for url in image_urls_each_color:
-            image_urls.append(url)
+        image_urls.append(image_urls_each_color[0])
         return image_urls
 
     def sku_currency(self, response):
