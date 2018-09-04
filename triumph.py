@@ -15,12 +15,11 @@ class Triumph(CrawlSpider):
         'http://uk.triumph.com/',
     )
 
-    listing_css = ['.mainMenu-holder', '.pagination-wrapper']
+    listing_css = ['[class=mainItem]', '.pagination-wrapper']
     product_css = ['.productgrid .thumbnail']
-    deny_r = ['/en_uk']
 
     rules = (
-        Rule(LinkExtractor(restrict_css=listing_css, deny=deny_r), callback='parse'),
+        Rule(LinkExtractor(restrict_css=listing_css), callback='parse'),
         Rule(LinkExtractor(restrict_css=product_css), callback='parse_item'),
     )
 
@@ -34,11 +33,12 @@ class Triumph(CrawlSpider):
 
         item.add_value('retailer_sku', self.retailer_sku(raw_product))
         item.add_value('name', self.product_name(raw_product))
-        item.add_value('color', self.color(raw_product))
-        item.add_value('retailer', self.retailer(raw_product))
+        item.add_value('retailer', self.retailer(response))
         item.add_value('brand', self.brand(raw_product))
+        item.add_value('feature', self.feature(raw_product))
         item.add_value('category', self.category(raw_product))
         item.add_value('description', self.description(response))
+        item.add_value('url', self.url(response))
 
         for i in range(0, len(color_urls)):
             color_url = response.urljoin(color_urls[i])
@@ -64,9 +64,10 @@ class Triumph(CrawlSpider):
             item.add_value('image_urls', response.meta['image_urls'])
             item.add_value('skus', response.meta['skus'])
 
-            yield {
-                'item': item.load_item()
-            }
+            yield item.load_item()
+
+    def url(self, response):
+        return response.url
 
     def image_urls_each_color(self, response):
         return response.css('.mainimageContainer img ::attr(src)').extract()
@@ -80,10 +81,10 @@ class Triumph(CrawlSpider):
     def skus(self, response, sizes, color, price, currency, image_urls_each_color):
         skus = response.meta['skus']
         sku = {}
-        for size in sizes:
-            sku[color + '-' + self.clean(size)] = {'color': color, 'size': self.clean(size),
-                                                   'price': price, 'currency': currency,
-                                                   'image_urls': image_urls_each_color}
+        for i in range(0, len(sizes)):
+            sku[i] = {'sku_id': color + '-' + self.clean(sizes[i]), 'color': color, 'size': self.clean(sizes[i]),
+                      'price': price, 'currency': currency,
+                      'image_urls': image_urls_each_color}
             skus.update(sku)
 
     def image_urls(self, response, image_urls_each_color):
@@ -92,16 +93,13 @@ class Triumph(CrawlSpider):
         return image_urls
 
     def sku_currency(self, response):
-        currency = response.css('.col .hide span[itemprop=priceCurrency] ::text').extract_first()
-        return currency
+        return response.css('.col .hide span[itemprop=priceCurrency] ::text').extract_first()
 
     def sku_price(self, response):
-        price = response.css('.col .hide span ::attr(content)').extract_first()
-        return price
+        return response.css('.col .hide span ::attr(content)').extract_first()
 
     def sku_color(self, response):
-        color = self.clean(response.css('.colorsizes_mobileselect .nonFunctionalLink ::text').extract_first())
-        return color
+        return self.clean(response.css('.colorsizes_mobileselect .nonFunctionalLink ::text').extract_first())
 
     def sizes(self, response):
         return response.css('.col .colorsizes_inner .overlaysizes li a ::text').extract()
@@ -112,7 +110,9 @@ class Triumph(CrawlSpider):
         return color_urls
 
     def description(self, response):
-        return self.clean(('.'.join(response.css('.description ::text').extract())))
+        description = response.css('.product_materials ::text').extract()
+        description += (response.css('.description ::text').extract())
+        return self.clean('.'.join(description))
 
     def category(self, raw_product):
         return raw_product['productCategory']
@@ -120,11 +120,11 @@ class Triumph(CrawlSpider):
     def brand(self, raw_product):
         return raw_product['ecommerce']['detail']['products'][0]['brand']
 
-    def retailer(self, raw_product):
-        return raw_product['ecommerce']['detail']['products'][0]['brand']
+    def feature(self, raw_product):
+        return raw_product['ecommerce']['detail']['products'][0]['category']
 
-    def color(self, raw_product):
-        return raw_product['productRealColor']
+    def retailer(self, response):
+        return response.css('.logo-wrapper title').extract_first()
 
     def raw_product(self, response):
         raw_product = response.css('script:contains(productRealColor) ::text').extract_first()
